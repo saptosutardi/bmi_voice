@@ -1,0 +1,88 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "com.example.bmi_voice"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.drsaptoapps.bmi_voice"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = 21
+        targetSdk = 34
+        versionCode 10
+        versionName "0.3"
+    }
+
+    buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            // signingConfig = signingConfigs.debug
+            signingConfigs {
+                release {
+                    keyAlias keystoreProperties['keyAlias']
+                    keyPassword keystoreProperties['keyPassword']
+                    storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                    storePassword keystoreProperties['storePassword']
+                }
+            }
+
+            buildTypes {
+                release {
+                    signingConfig signingConfigs.release
+                    minifyEnabled true
+                    shrinkResources true
+                    proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                    // Gunakan minifyEnabled true/false sesuai kebutuhan
+                    
+                    ndk {
+                        debugSymbolLevel 'FULL'
+                    }
+                }
+            }
+
+            // Tambahkan task untuk membuat ZIP
+    applicationVariants.all { variant ->
+        if (variant.buildType.name == "release") {
+            def symbolsDir = "${buildDir}/outputs/symbols"
+            def zipFile = file("${buildDir}/outputs/native-debug-symbols-${variant.versionCode}.zip")
+
+            task "package${variant.name.capitalize()}NativeSymbols"(type: Zip) {
+                archiveFileName = zipFile.name
+                destinationDirectory = zipFile.parentFile
+                from symbolsDir
+            }
+
+            variant.assembleProvider.get().finalizedBy "package${variant.name.capitalize()}NativeSymbols"
+        }
+    }
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}

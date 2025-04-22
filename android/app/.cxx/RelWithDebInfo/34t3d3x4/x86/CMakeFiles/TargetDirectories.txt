@@ -1,0 +1,2 @@
+D:/FlutterProjects/bmi_voice/android/app/.cxx/RelWithDebInfo/34t3d3x4/x86/CMakeFiles/edit_cache.dir
+D:/FlutterProjects/bmi_voice/android/app/.cxx/RelWithDebInfo/34t3d3x4/x86/CMakeFiles/rebuild_cache.dir
