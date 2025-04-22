@@ -98,8 +98,7 @@ dr. Sapto Sutardi
 
 For support, feature requests, or bug reports:
 - GitHub Issues
-- Email: [akan_ditambahkan@email.com]
-- Twitter: [@saptos](https://twitter.com/saptos)
+- Email: [xup2sutardi@gmail.com]
 
 ## License
 
