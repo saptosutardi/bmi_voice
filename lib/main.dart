@@ -115,6 +115,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   late Animation<double> _animation;
 
+  String selectedRegion = 'WPRO'; // Default ke Asia-Pasifik
+
   @override
   void initState() {
     super.initState();
@@ -1227,6 +1229,16 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           ),
         ],
       ),
+      drawer: RegionDrawer(
+        selectedRegion: selectedRegion,
+        onRegionSelected: (RegionData region) {
+          setState(() {
+            selectedRegion = region.code;
+            // Di sini Anda bisa menambahkan logika untuk mengupdate
+            // perhitungan BMI berdasarkan standar yang baru
+          });
+        },
+      ),
     );
   }
 
@@ -1253,8 +1265,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           children: [
             Text(
               _isEnglish
-                  ? 'Tap the microphone button below and say your height and weight in any unit (kg, cm).'
-                  : 'Tekan tombol mikrofon di bawah dan ucapkan tinggi badan dan berat badan Anda dalam satuan apa saja (kg, cm',
+                  ? 'Tap the microphone button below and say your height and weight in any unit (kg, cm, lbs, in).'
+                  : 'Tekan tombol mikrofon di bawah dan ucapkan tinggi badan dan berat badan Anda dalam satuan apa saja (kg, cm, lbs, in).',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -1793,9 +1805,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.only(
+        borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(12),
           bottomRight: Radius.circular(12),
         ),
@@ -1927,24 +1939,26 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   Widget _buildGaugeSection(
       double gaugeWidth, double gaugeFontSize, double arrowPosition) {
-    // Definisikan flex values
-    const int underweightFlex = 80;
-    const int normalFlex = 100;
-    const int overweightFlex = 100;
-    const int obeseIFlex = 100;
-    const int obeseIIFlex = 80;
-    const int totalFlex = underweightFlex +
-        normalFlex +
-        overweightFlex +
-        obeseIFlex +
-        obeseIIFlex;
+    final standard = bmiStandards[selectedRegion]!;
+    final thresholds = standard.thresholds;
+    final categories = standard.categories;
+    final colors = standard.colors;
 
-    // Hitung lebar sebenarnya untuk setiap segmen
-    final double pixelsPerFlex = gaugeWidth / totalFlex;
-    final double underweightWidth = underweightFlex * pixelsPerFlex;
-    final double normalWidth = normalFlex * pixelsPerFlex;
-    final double overweightWidth = overweightFlex * pixelsPerFlex;
-    final double obeseIWidth = obeseIFlex * pixelsPerFlex;
+    // Calculate flex values based on the number of categories
+    final List<int> flexValues = [];
+
+    for (int i = 0; i < categories.length; i++) {
+      if (i == 0) {
+        flexValues.add(80); // First segment (underweight)
+      } else if (i == categories.length - 1) {
+        flexValues.add(80); // Last segment (highest obesity)
+      } else {
+        flexValues.add(100); // Middle segments
+      }
+    }
+
+    final totalFlex = flexValues.reduce((a, b) => a + b);
+    final pixelsPerFlex = gaugeWidth / totalFlex;
 
     return Stack(
       alignment: Alignment.centerRight,
@@ -1960,20 +1974,38 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   height: 24,
                   width: gaugeWidth,
                   child: Row(
-                    children: [
-                      Expanded(
-                        flex: underweightFlex,
+                    children: List.generate(categories.length, (index) {
+                      final startValue =
+                          index == 0 ? 0.0 : thresholds[index - 1].toDouble();
+                      final endValue = index < thresholds.length
+                          ? thresholds[index].toDouble()
+                          : double.infinity;
+                      final color = colors[index];
+
+                      return Expanded(
+                        flex: flexValues[index],
                         child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(12),
-                              bottomLeft: Radius.circular(12),
-                            ),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: index == 0
+                                ? const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    bottomLeft: Radius.circular(12),
+                                  )
+                                : index == categories.length - 1
+                                    ? const BorderRadius.only(
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      )
+                                    : null,
                           ),
                           child: Center(
                             child: Text(
-                              _isEnglish ? '< 18.5' : '< 18,5',
+                              index == 0
+                                  ? '< ${_formatNumber(thresholds[0])}' // Menggunakan threshold pertama (18.5)
+                                  : index == categories.length - 1
+                                      ? '≥ ${_formatNumber(startValue)}'
+                                      : '${_formatNumber(startValue)} - ${_formatNumber(endValue)}',
                               style: TextStyle(
                                 fontSize: gaugeFontSize,
                                 color: Colors.white,
@@ -1982,88 +2014,17 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        flex: normalFlex,
-                        child: Container(
-                          color: Colors.green,
-                          child: Center(
-                            child: Text(
-                              _isEnglish ? '18.5 - 22.9' : '18,5 - 22,9',
-                              style: TextStyle(
-                                fontSize: gaugeFontSize,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: overweightFlex,
-                        child: Container(
-                          color: Colors.orange,
-                          child: Center(
-                            child: Text(
-                              _isEnglish ? '23 - 24.9' : '23 - 24,9',
-                              style: TextStyle(
-                                fontSize: gaugeFontSize,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: obeseIFlex,
-                        child: Container(
-                          color: Colors.deepOrange,
-                          child: Center(
-                            child: Text(
-                              _isEnglish ? '25 - 29.9' : '25 - 29,9',
-                              style: TextStyle(
-                                fontSize: gaugeFontSize,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: obeseIIFlex,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.only(
-                              topRight: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '≥ 30',
-                              style: TextStyle(
-                                fontSize: gaugeFontSize,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    }),
                   ),
                 ),
                 Positioned(
                   left: _calculateArrowPositionWithFlex(
                     bmi: _bmi!,
                     gaugeWidth: gaugeWidth,
-                    underweightWidth: underweightWidth,
-                    normalWidth: normalWidth,
-                    overweightWidth: overweightWidth,
-                    obeseIWidth: obeseIWidth,
+                    thresholds: thresholds.map((t) => t.toDouble()).toList(),
+                    flexValues: flexValues,
+                    pixelsPerFlex: pixelsPerFlex,
                   ),
                   top: -30,
                   child: Column(
@@ -2096,48 +2057,26 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               width: gaugeWidth,
               margin: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
-                children: [
-                  Expanded(
-                    flex: underweightFlex,
+                children: List.generate(categories.length, (index) {
+                  final category = categories[index];
+                  final color = colors[index];
+                  final isCurrent = _isCurrentCategory(
+                    _bmi!,
+                    index == 0 ? 0.0 : thresholds[index - 1].toDouble(),
+                    index == categories.length - 1
+                        ? double.infinity
+                        : thresholds[index].toDouble(),
+                  );
+
+                  return Expanded(
+                    flex: flexValues[index],
                     child: _buildCategoryLabel(
-                      _isEnglish ? 'Under' : 'Kurang',
-                      Colors.blue,
-                      isCurrent: _bmi != null && _bmi! < 18.5,
+                      category,
+                      color,
+                      isCurrent: isCurrent,
                     ),
-                  ),
-                  Expanded(
-                    flex: normalFlex,
-                    child: _buildCategoryLabel(
-                      _isEnglish ? 'Normal' : 'Normal',
-                      Colors.green,
-                      isCurrent: _bmi != null && _bmi! >= 18.5 && _bmi! < 23,
-                    ),
-                  ),
-                  Expanded(
-                    flex: overweightFlex,
-                    child: _buildCategoryLabel(
-                      _isEnglish ? 'Over' : 'Lebih',
-                      Colors.orange,
-                      isCurrent: _bmi != null && _bmi! >= 23 && _bmi! < 25,
-                    ),
-                  ),
-                  Expanded(
-                    flex: obeseIFlex,
-                    child: _buildCategoryLabel(
-                      _isEnglish ? 'Obese I' : 'Obes I',
-                      Colors.deepOrange,
-                      isCurrent: _bmi != null && _bmi! >= 25 && _bmi! < 30,
-                    ),
-                  ),
-                  Expanded(
-                    flex: obeseIIFlex,
-                    child: _buildCategoryLabel(
-                      _isEnglish ? 'Obese II' : 'Obes II',
-                      Colors.red,
-                      isCurrent: _bmi != null && _bmi! >= 30,
-                    ),
-                  ),
-                ],
+                  );
+                }),
               ),
             ),
           ],
@@ -2149,55 +2088,44 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   double _calculateArrowPositionWithFlex({
     required double bmi,
     required double gaugeWidth,
-    required double underweightWidth,
-    required double normalWidth,
-    required double overweightWidth,
-    required double obeseIWidth,
+    required List<double> thresholds,
+    required List<int> flexValues,
+    required double pixelsPerFlex,
   }) {
-    const double arrowOffset = 12.0; // Setengah lebar arrow untuk centering
+    const double arrowOffset = 12.0;
 
-    if (bmi < 18.5) {
-      // Underweight section
-      return (bmi / 18.5) * underweightWidth - arrowOffset;
-    } else if (bmi < 23) {
-      // Normal section
-      return underweightWidth +
-          ((bmi - 18.5) / (23 - 18.5)) * normalWidth -
-          arrowOffset;
-    } else if (bmi < 25) {
-      // Overweight section
-      return (underweightWidth + normalWidth) +
-          ((bmi - 23) / (25 - 23)) * overweightWidth -
-          arrowOffset;
-    } else if (bmi < 30) {
-      // Obese I section
-      return (underweightWidth + normalWidth + overweightWidth) +
-          ((bmi - 25) / (30 - 25)) * obeseIWidth -
-          arrowOffset;
-    } else {
-      // Obese II section
-      const double maxBMI = 50; // Maksimum BMI yang ditampilkan
-      const double minMarginRight = 0.05;
-      final double remainingWidth = gaugeWidth -
-          (underweightWidth + normalWidth + overweightWidth + obeseIWidth);
-      final double maxPosition = gaugeWidth * (1 - minMarginRight);
-      final double obeseIIPosition = (underweightWidth +
-              normalWidth +
-              overweightWidth +
-              obeseIWidth) +
-          math.min(
-              ((bmi - 30) / (maxBMI - 30)) * remainingWidth, remainingWidth) -
-          arrowOffset;
+    for (int i = 0; i < thresholds.length; i++) {
+      final startValue = i == 0 ? 0.0 : thresholds[i - 1];
+      final endValue = thresholds[i];
 
-      return math.min(obeseIIPosition, maxPosition);
+      if (bmi < endValue) {
+        double position = 0.0;
+        for (int j = 0; j < i; j++) {
+          position += flexValues[j] * pixelsPerFlex;
+        }
+
+        final segmentWidth = flexValues[i] * pixelsPerFlex;
+        final progress = (bmi - startValue) / (endValue - startValue);
+        return position + (progress * segmentWidth) - arrowOffset;
+      }
     }
+
+    // If BMI is higher than the last threshold
+    double position = 0.0;
+    for (int i = 0; i < thresholds.length - 1; i++) {
+      position += flexValues[i] * pixelsPerFlex;
+    }
+    return position + (flexValues.last * pixelsPerFlex) - arrowOffset;
+  }
+
+  bool _isCurrentCategory(double bmi, double startValue, double endValue) {
+    return bmi >= startValue && bmi < endValue;
   }
 
   Widget _buildRiskTable() {
     // Tingkatkan nilai default minimum untuk tinggi tabel
-    const double defaultMinHeight = 170.0; // Ditingkatkan dari 170 ke 220
-    const double extraPadding =
-        16.0; // Tambahan padding untuk memastikan konten tidak terpotong
+    const double defaultMinHeight = 170.0;
+    const double extraPadding = 16.0;
 
     return ClipRect(
       child: TweenAnimationBuilder<double>(
@@ -2208,13 +2136,11 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         builder: (context, value, child) {
-          // Gunakan nilai yang lebih besar antara _tableHeight + extraPadding dan defaultMinHeight
           final effectiveHeight =
               math.max(_tableHeight + extraPadding, defaultMinHeight);
           return SizedBox(
             height: effectiveHeight * value,
             child: SingleChildScrollView(
-              // Tambahkan SingleChildScrollView untuk mencegah overflow
               child: child,
             ),
           );
@@ -2222,13 +2148,11 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         child: _showClassification
             ? Builder(
                 builder: (context) {
-                  // Ukur ulang tinggi tabel setiap kali ditampilkan
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _measureTableHeight();
                   });
                   return Padding(
-                    padding: const EdgeInsets.only(
-                        bottom: 8.0), // Tambahkan padding bawah
+                    padding: const EdgeInsets.only(bottom: 8.0),
                     child: _buildBMIClassificationTable(),
                   );
                 },
@@ -2239,9 +2163,14 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   Widget _buildBMIClassificationTable() {
+    final standard = bmiStandards[selectedRegion]!;
+    final thresholds = standard.thresholds;
+    final categories = standard.categories;
+    final colors = standard.colors;
+
     return Card(
       elevation: 0,
-      margin: EdgeInsets.zero, // Hapus margin default dari Card
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
@@ -2250,13 +2179,12 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(4),
         child: Table(
           key: _tableKey,
-          defaultVerticalAlignment:
-              TableCellVerticalAlignment.middle, // Tambahkan alignment
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           columnWidths: const {
-            0: FlexColumnWidth(2.5),
+            0: FlexColumnWidth(2.0),
             1: FlexColumnWidth(1.5),
             2: FlexColumnWidth(1.5),
           },
@@ -2268,91 +2196,67 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                 _buildTableHeader(_isEnglish ? 'Risk' : 'Risiko'),
               ],
             ),
-            ..._buildTableRows(),
+            ..._buildTableRows(standard),
           ],
         ),
       ),
     );
   }
 
-  List<TableRow> _buildTableRows() {
-    final List<Map<String, dynamic>> categories = [
-      {
-        'categoryId': 'BB Kurang',
-        'categoryEn': 'Underweight',
-        'rangeId': '< 18,5',
-        'rangeEn': '< 18.5',
-        'color': Colors.blue,
-        'riskId': 'Rendah',
-        'riskEn': 'Low',
-      },
-      {
-        'categoryId': 'Normal',
-        'categoryEn': 'Normal',
-        'rangeId': '18,5 - 22,9',
-        'rangeEn': '18.5 - 22.9',
-        'color': Colors.green,
-        'riskId': 'Rata-rata',
-        'riskEn': 'Average',
-      },
-      {
-        'categoryId': 'BB lebih dgn Risiko',
-        'categoryEn': 'Overweight at Risk',
-        'rangeId': '23 - 24,9',
-        'rangeEn': '23 - 24.9',
-        'color': Colors.orange,
-        'riskId': 'Meningkat',
-        'riskEn': 'Increased',
-      },
-      {
-        'categoryId': 'Obesitas I',
-        'categoryEn': 'Obese I',
-        'rangeId': '25 - 29,9',
-        'rangeEn': '25 - 29.9',
-        'color': Colors.deepOrange,
-        'riskId': 'Menengah',
-        'riskEn': 'Moderate',
-      },
-      {
-        'categoryId': 'Obesitas II',
-        'categoryEn': 'Obese II',
-        'rangeId': '≥ 30',
-        'rangeEn': '≥ 30',
-        'color': Colors.red,
-        'riskId': 'Tinggi',
-        'riskEn': 'Severe',
-      },
-    ];
+  List<TableRow> _buildTableRows(BMIThresholds standard) {
+    final List<TableRow> rows = [];
+    final thresholds = standard.thresholds;
+    final categories = standard.categories;
+    final colors = standard.colors;
 
-    return categories.map((cat) {
-      final isCurrentCategory = _isCategoryMatch(
-        _isEnglish ? cat['rangeEn'] as String : cat['rangeId'] as String,
-      );
-      return _buildTableRow(
-        _isEnglish ? cat['categoryEn'] as String : cat['categoryId'] as String,
-        _isEnglish ? cat['rangeEn'] as String : cat['rangeId'] as String,
-        _isEnglish ? cat['riskEn'] as String : cat['riskId'] as String,
-        cat['color'] as Color,
-        isCurrentCategory,
-      );
-    }).toList();
+    for (int i = 0; i < categories.length; i++) {
+      final category = categories[i];
+      final color = colors[i];
+      final isCurrent = _isCurrentCategoryForTable(_bmi!, i, thresholds);
+
+      String rangeText;
+      if (i == 0) {
+        rangeText = '< ${thresholds[0].toStringAsFixed(1)}';
+      } else if (i == categories.length - 1) {
+        rangeText = '≥ ${thresholds[i - 1].toStringAsFixed(1)}';
+      } else {
+        rangeText =
+            '${thresholds[i - 1].toStringAsFixed(1)} - ${thresholds[i].toStringAsFixed(1)}';
+      }
+
+      rows.add(_buildTableRow(
+        _toTitleCase(category),
+        rangeText,
+        _getRiskLevel(category),
+        color,
+        isCurrent,
+      ));
+    }
+
+    return rows;
+  }
+
+  bool _isCurrentCategoryForTable(
+      double bmi, int index, List<double> thresholds) {
+    if (index == 0) {
+      return bmi < thresholds[0];
+    } else if (index == thresholds.length) {
+      return bmi >= thresholds[index - 1];
+    } else {
+      return bmi >= thresholds[index - 1] && bmi < thresholds[index];
+    }
   }
 
   TableRow _buildTableRow(
       String category, String range, String risk, Color color, bool isCurrent) {
-    const double fontSize = 12;
-    final double iconSize = fontSize + 2;
-
+    const double fontSize = 11;
     return TableRow(
-      decoration: isCurrent
-          ? BoxDecoration(
-              color: color.withAlpha(50),
-              borderRadius: BorderRadius.circular(8),
-            )
-          : null,
+      decoration: BoxDecoration(
+        color: isCurrent ? color.withOpacity(0.1) : null,
+      ),
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4.0, top: 4, bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: Text(
             category,
             style: TextStyle(
@@ -2362,7 +2266,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: Text(
             range,
             style: TextStyle(
@@ -2372,100 +2276,28 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: (category == 'BB Kurang' || category == 'Underweight')
-              ? InkWell(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(_isEnglish
-                            ? 'Risk Information'
-                            : 'Informasi Risiko'),
-                        content: Text(
-                          _isEnglish
-                              ? 'Low risk of obesity-related diseases, but increased risk of other clinical issues (e.g., malnutrition, osteoporosis).'
-                              : 'Risiko rendah untuk penyakit terkait obesitas, tetapi risiko masalah klinis lain meningkat (misalnya, malnutrisi, osteoporosis).',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: _textButtonStyle,
-                            child: Text(_isEnglish ? 'Close' : 'Tutup'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  splashColor:
-                      Colors.purple[200]?.withAlpha((0.3 * 255).toInt()),
-                  highlightColor:
-                      Colors.purple[100]?.withAlpha((0.2 * 255).toInt()),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        risk,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight:
-                              isCurrent ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4.0),
-                        child: Icon(
-                          Icons.info_outline,
-                          size: iconSize,
-                          color: Colors.purple[800],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : Text(
-                  risk,
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Text(
+            risk,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  bool _isCategoryMatch(String range) {
-    if (_bmi == null) return false;
-
-    final roundedBMI = double.parse(_bmi!.toStringAsFixed(1));
-    final cleanedRange = range.replaceAll(RegExp(r'[<≥]'), '').trim();
-    final rangeParts = cleanedRange.split(' - ');
-
-    final minValue = _parseNumber(rangeParts[0]);
-    final maxValue = rangeParts.length > 1 ? _parseNumber(rangeParts[1]) : null;
-
-    if (range.contains('<')) {
-      return roundedBMI < minValue!;
-    } else if (range.contains('≥')) {
-      return roundedBMI >= minValue!;
-    } else if (maxValue != null) {
-      return roundedBMI >= minValue! && roundedBMI <= maxValue;
-    }
-
-    return false;
-  }
-
   Widget _buildTableHeader(String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Text(
         text,
         style: const TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.purple,
-          fontSize: 12,
+          fontSize: 11,
         ),
       ),
     );
@@ -2473,6 +2305,59 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   Widget _buildCategoryLabel(String title, Color color,
       {bool isCurrent = false}) {
+    // Fungsi untuk memisahkan teks menjadi baris yang lebih baik
+    List<String> _splitText(String text) {
+      if (text.length <= 8) return [_toTitleCase(text)];
+
+      // Daftar kata-kata majemuk yang umum dalam kategori BMI
+      final compoundWords = {
+        'underweight': ['Under', 'Weight'],
+        'overweight': ['Over', 'Weight'],
+        'pre-obese': ['Pre', 'Obese'],
+        'obese i': ['Obese', 'I'],
+        'obese ii': ['Obese', 'II'],
+        'obese iii': ['Obese', 'III'],
+        'obese iv': ['Obese', 'IV'],
+        'bb kurang': ['BB', 'Kurang'],
+        'bb lebih': ['BB', 'Lebih'],
+        'bb normal': ['BB', 'Normal'],
+      };
+
+      // Cek apakah teks adalah kata majemuk yang sudah kita ketahui
+      final lowerText = text.toLowerCase();
+      if (compoundWords.containsKey(lowerText)) {
+        return compoundWords[lowerText]!;
+      }
+
+      // Jika tidak, gunakan Title Case untuk setiap kata
+      final words = text.split(' ');
+      if (words.length > 1) {
+        final firstLine =
+            words.take(words.length ~/ 2).map(_toTitleCase).join(' ');
+        final secondLine =
+            words.skip(words.length ~/ 2).map(_toTitleCase).join(' ');
+        return [firstLine, secondLine];
+      }
+
+      final midPoint = text.length ~/ 2;
+      final splitPoints = [' ', '-', '_'];
+      int bestSplit = midPoint;
+
+      for (int i = midPoint - 2; i <= midPoint + 2; i++) {
+        if (i > 0 && i < text.length && splitPoints.contains(text[i])) {
+          bestSplit = i + 1;
+          break;
+        }
+      }
+
+      return [
+        _toTitleCase(text.substring(0, bestSplit)),
+        _toTitleCase(text.substring(bestSplit))
+      ];
+    }
+
+    final lines = _splitText(title);
+
     return GestureDetector(
       onTap: isCurrent
           ? () {
@@ -2492,15 +2377,15 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              softWrap: true,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
+            ...lines.map((line) => Text(
+                  line,
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  ),
+                )),
             SizedBox(
               height: 16,
               child: isCurrent
@@ -2569,6 +2454,30 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     if (_bmi! < 25) return Colors.orange;
     if (_bmi! < 30) return Colors.deepOrange;
     return Colors.red;
+  }
+
+  String _getRiskLevel(String category) {
+    switch (category.toLowerCase()) {
+      case 'underweight':
+        return _isEnglish ? 'Low' : 'Rendah';
+      case 'normal':
+      case 'normal weight':
+        return _isEnglish ? 'Average' : 'Rata-rata';
+      case 'overweight':
+      case 'pre-obese':
+        return _isEnglish ? 'Increased' : 'Meningkat';
+      case 'obese':
+      case 'obese i':
+        return _isEnglish ? 'Moderate' : 'Menengah';
+      case 'obese ii':
+        return _isEnglish ? 'Severe' : 'Tinggi';
+      case 'obese iii':
+        return _isEnglish ? 'Very High' : 'Sangat Tinggi';
+      case 'obese iv':
+        return _isEnglish ? 'Extremely High' : 'Ekstrem Tinggi';
+      default:
+        return _isEnglish ? 'Unknown' : 'Tidak Diketahui';
+    }
   }
 
   Widget _buildMicSection() {
@@ -2806,6 +2715,31 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       }
     }
   }
+
+  String _toTitleCase(String text) {
+    // Daftar kata yang harus tetap uppercase
+    final upperCaseWords = ['BB', 'TB', 'BMI', 'I', 'II', 'III', 'IV'];
+    if (upperCaseWords.contains(text)) return text;
+
+    // Pisahkan kata berdasarkan spasi dan strip
+    final words = text.split(RegExp(r'[ -]'));
+    final titleCaseWords = words.map((word) {
+      if (word.isEmpty) return word;
+      // Jika kata ada dalam daftar uppercase, kembalikan apa adanya
+      if (upperCaseWords.contains(word.toUpperCase())) {
+        return word.toUpperCase();
+      }
+      // Ubah ke Title Case
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    });
+
+    // Gabungkan kembali dengan mempertahankan pemisah asli (spasi atau strip)
+    var result = text;
+    for (var i = 0; i < words.length; i++) {
+      result = result.replaceFirst(words[i], titleCaseWords.elementAt(i));
+    }
+    return result;
+  }
 }
 
 class SiriLogoWidgetV2 extends StatelessWidget {
@@ -2954,3 +2888,360 @@ class BMIRecordAdapter extends TypeAdapter<BMIRecord> {
     writer.write(obj.timestamp);
   }
 }
+
+// Buat class untuk menyimpan data regional/negara
+class RegionData {
+  final String name;
+  final IconData icon; // Menggunakan IconData alih-alih iconPath
+  final String code;
+  final Map<String, double> bmiThresholds;
+
+  RegionData({
+    required this.name,
+    required this.icon,
+    required this.code,
+    required this.bmiThresholds,
+  });
+}
+
+// Update daftar region dengan Material Icons
+final List<RegionData> regions = [
+  RegionData(
+    name: 'WHO (Global)',
+    icon: Icons.public, // Icon globe untuk standar global
+    code: 'WHO',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 24.9,
+      'overweight': 29.9,
+      'obese': 30.0,
+    },
+  ),
+  RegionData(
+    name: 'Asia-Pasifik (WPRO)',
+    icon: Icons.terrain, // Icon untuk merepresentasikan Asia-Pasifik
+    code: 'WPRO',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 22.9,
+      'overweight': 24.9,
+      'obese': 25.0,
+    },
+  ),
+  RegionData(
+    name: 'China (WGOC)',
+    icon: Icons.architecture, // Icon untuk merepresentasikan China
+    code: 'CN',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 23.9,
+      'overweight': 27.9,
+      'obese': 28.0,
+    },
+  ),
+  RegionData(
+    name: 'Japan (JASSO)',
+    icon: Icons.temple_buddhist, // Icon untuk merepresentasikan Jepang
+    code: 'JP',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 22.9,
+      'pre_obese': 24.9,
+      'obese_1': 29.9,
+      'obese_2': 34.9,
+      'obese_3': 39.9,
+      'obese_4': 40.0,
+    },
+  ),
+  RegionData(
+    name: 'India',
+    icon: Icons.mosque, // Icon untuk merepresentasikan India
+    code: 'IN',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 22.9,
+      'overweight': 24.9,
+      'obese': 25.0,
+    },
+  ),
+  RegionData(
+    name: 'Singapore',
+    icon: Icons.location_city, // Icon untuk merepresentasikan Singapura
+    code: 'SG',
+    bmiThresholds: {
+      'underweight': 18.5,
+      'normal': 22.9,
+      'overweight': 27.4,
+      'obese': 27.5,
+    },
+  ),
+];
+
+class RegionDrawer extends StatefulWidget {
+  final String selectedRegion;
+  final Function(RegionData) onRegionSelected;
+
+  const RegionDrawer({
+    Key? key,
+    required this.selectedRegion,
+    required this.onRegionSelected,
+  }) : super(key: key);
+
+  @override
+  State<RegionDrawer> createState() => _RegionDrawerState();
+}
+
+class _RegionDrawerState extends State<RegionDrawer> {
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).primaryColor,
+                  Theme.of(context).primaryColor.withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.health_and_safety,
+                  size: 48,
+                  color: Colors.white,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Standar BMI Regional',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Pilih standar yang sesuai dengan region Anda',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: regions.length,
+              itemBuilder: (context, index) {
+                final region = regions[index];
+                final isSelected = region.code == widget.selectedRegion;
+
+                return Container(
+                  margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                        : null,
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? Theme.of(context).primaryColor.withOpacity(0.2)
+                            : Colors.grey.withOpacity(0.1),
+                      ),
+                      child: Icon(
+                        region.icon,
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey[600],
+                        size: 24,
+                      ),
+                    ),
+                    title: Text(
+                      region.name,
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
+                            : Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _getRegionDescription(region),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    onTap: () {
+                      widget.onRegionSelected(region);
+                      Navigator.pop(context);
+                    },
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_circle,
+                            color: Theme.of(context).primaryColor,
+                          )
+                        : null,
+                  ),
+                );
+              },
+            ),
+          ),
+          Divider(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Standar BMI akan mempengaruhi kategori dan rekomendasi yang diberikan',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRegionDescription(RegionData region) {
+    switch (region.code) {
+      case 'WHO':
+        return 'Standar internasional WHO';
+      case 'WPRO':
+        return 'Disesuaikan untuk populasi Asia-Pasifik';
+      case 'CN':
+        return 'Standar nasional China';
+      case 'JP':
+        return 'Standar JASSO dengan 4 tingkat obesitas';
+      case 'IN':
+        return 'Kriteria khusus populasi India';
+      case 'SG':
+        return 'Standar kesehatan Singapura';
+      default:
+        return '';
+    }
+  }
+}
+
+class BMIThresholds {
+  final String name;
+  final List<double> thresholds;
+  final List<String> categories;
+  final List<Color> colors;
+
+  BMIThresholds({
+    required this.name,
+    required this.thresholds,
+    required this.categories,
+    required this.colors,
+  });
+}
+
+final Map<String, BMIThresholds> bmiStandards = {
+  'WHO': BMIThresholds(
+    name: 'WHO (Global)',
+    thresholds: [18.5, 25.0, 30.0, 35.0, 40.0],
+    categories: [
+      'Underweight',
+      'Normal',
+      'Overweight',
+      'Obese I',
+      'Obese II',
+      'Obese III'
+    ],
+    colors: [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.red,
+      Colors.red[700]!,
+      Colors.red[900]!
+    ],
+  ),
+  'WPRO': BMIThresholds(
+    name: 'Asia-Pasifik (WPRO)',
+    thresholds: [18.5, 23.0, 25.0, 30.0],
+    categories: ['Underweight', 'Normal', 'Overweight', 'Obese I', 'Obese II'],
+    colors: [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.red,
+      Colors.red[900]!
+    ],
+  ),
+  'CN': BMIThresholds(
+    name: 'China (WGOC)',
+    thresholds: [18.5, 24.0, 28.0],
+    categories: ['Underweight', 'Normal', 'Overweight', 'Obese'],
+    colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
+  ),
+  'JP': BMIThresholds(
+    name: 'Japan (JASSO)',
+    thresholds: [18.5, 23.0, 25.0, 30.0, 35.0, 40.0],
+    categories: [
+      'Underweight',
+      'Normal',
+      'Pre-obese',
+      'Obese I',
+      'Obese II',
+      'Obese III',
+      'Obese IV'
+    ],
+    colors: [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.deepOrange,
+      Colors.red,
+      Colors.red[700]!,
+      Colors.red[900]!
+    ],
+  ),
+  'IN': BMIThresholds(
+    name: 'India',
+    thresholds: [18.5, 23.0, 25.0, 30.0],
+    categories: ['Underweight', 'Normal', 'Overweight', 'Obese I', 'Obese II'],
+    colors: [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.red,
+      Colors.red[900]!
+    ],
+  ),
+  'SG': BMIThresholds(
+    name: 'Singapore',
+    thresholds: [18.5, 23.0, 27.5],
+    categories: ['Underweight', 'Normal', 'Overweight', 'Obese'],
+    colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
+  ),
+};
