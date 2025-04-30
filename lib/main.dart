@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
@@ -153,6 +154,17 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         _showError(_isEnglish ? "Connection lost" : "Koneksi terputus");
       }
     });
+
+    _loadSavedRegion();
+  }
+
+  Future<void> _loadSavedRegion() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? savedRegion = prefs.getString('selectedRegion');
+    if (savedRegion != null) {
+      // Gunakan savedRegion sesuai kebutuhan
+      // Misalnya update state atau panggil widget.onRegionSelected
+    }
   }
 
   @override
@@ -1216,7 +1228,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  left: 16,
+                  left: 42,
                   top: 0,
                   child: _buildManualInputButton(),
                 ),
@@ -1818,7 +1830,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           children: [
             _buildTopSection(screenWidth),
             const SizedBox(height: 14),
-            _buildGaugeSection(gaugeWidth, gaugeFontSize, arrowPosition),
+            _buildGaugeSection(gaugeWidth, gaugeFontSize),
             _buildRiskTable(),
           ],
         ),
@@ -1937,8 +1949,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     );
   }
 
-  Widget _buildGaugeSection(
-      double gaugeWidth, double gaugeFontSize, double arrowPosition) {
+  Widget _buildGaugeSection(double gaugeWidth, double gaugeFontSize) {
     final standard = bmiStandards[selectedRegion]!;
     final thresholds = standard.thresholds;
     final categories = standard.categories;
@@ -1971,7 +1982,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               clipBehavior: Clip.none,
               children: [
                 SizedBox(
-                  height: 24,
+                  height: 12,
                   width: gaugeWidth,
                   child: Row(
                     children: List.generate(categories.length, (index) {
@@ -1999,20 +2010,20 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                                       )
                                     : null,
                           ),
-                          child: Center(
-                            child: Text(
-                              index == 0
-                                  ? '< ${_formatNumber(thresholds[0])}' // Menggunakan threshold pertama (18.5)
-                                  : index == categories.length - 1
-                                      ? '≥ ${_formatNumber(startValue)}'
-                                      : '${_formatNumber(startValue)} - ${_formatNumber(endValue)}',
-                              style: TextStyle(
-                                fontSize: gaugeFontSize,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
+                          // child: Center(
+                          //   child: Text(
+                          //     index == 0
+                          //         ? '< ${_formatNumber(thresholds[0])}' // Menggunakan threshold pertama (18.5)
+                          //         : index == categories.length - 1
+                          //             ? '≥ ${_formatNumber(startValue)}'
+                          //             : '${_formatNumber(startValue)} - ${_formatNumber(endValue)}',
+                          //     style: TextStyle(
+                          //       fontSize: gaugeFontSize,
+                          //       color: Colors.white,
+                          //       fontWeight: FontWeight.bold,
+                          //     ),
+                          //   ),
+                          // ),
                         ),
                       );
                     }),
@@ -2050,34 +2061,71 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Container(
-              width: gaugeWidth,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: List.generate(categories.length, (index) {
-                  final category = categories[index];
-                  final color = colors[index];
-                  final isCurrent = _isCurrentCategory(
-                    _bmi!,
-                    index == 0 ? 0.0 : thresholds[index - 1].toDouble(),
-                    index == categories.length - 1
-                        ? double.infinity
-                        : thresholds[index].toDouble(),
-                  );
-
-                  return Expanded(
-                    flex: flexValues[index],
-                    child: _buildCategoryLabel(
-                      category,
-                      color,
-                      isCurrent: isCurrent,
+                ...List.generate(thresholds.length, (index) {
+                  double position = 0;
+                  for (int i = 0; i <= index; i++) {
+                    position += flexValues[i] * pixelsPerFlex;
+                  }
+                  return Positioned(
+                    left: position - 12, // Center the arrow
+                    bottom: -14,
+                    child: Text(
+                      thresholds[index].toStringAsFixed(1),
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[500],
+                      ),
                     ),
                   );
                 }),
-              ),
+                Positioned(
+                  left: _calculateArrowPositionWithFlex(
+                    bmi: _bmi!,
+                    gaugeWidth: gaugeWidth,
+                    thresholds: thresholds.map((t) => t.toDouble()).toList(),
+                    flexValues: flexValues,
+                    pixelsPerFlex: pixelsPerFlex,
+                  ),
+                  bottom: -16,
+                  child: Icon(
+                    Icons.arrow_drop_up,
+                    size: 24,
+                    color: Colors.red[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Stack(
+              children: [
+                Container(
+                  width: gaugeWidth,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: List.generate(categories.length, (index) {
+                      final category = categories[index];
+                      final color = colors[index];
+                      final isCurrent = _isCurrentCategory(
+                        _bmi!,
+                        index == 0 ? 0.0 : thresholds[index - 1].toDouble(),
+                        index == categories.length - 1
+                            ? double.infinity
+                            : thresholds[index].toDouble(),
+                      );
+
+                      return Expanded(
+                        flex: flexValues[index],
+                        child: _buildCategoryLabel(
+                          category,
+                          color,
+                          isCurrent: isCurrent,
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -2537,6 +2585,10 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                         child: SiriLogoWidgetV2(
                           animationValue: _animation.value,
                           isActive: true,
+                          // Gunakan level suara dari recognizedWords untuk animasi
+                          // Semakin panjang teks, semakin tinggi level suara (simulasi sederhana)
+                          soundLevel:
+                              _isListening ? _calculateSoundLevel() : 0.5,
                         ),
                       ),
                       if (!_isSpeechAvailable)
@@ -2740,15 +2792,25 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     }
     return result;
   }
+
+  // Variabel untuk menyimpan level suara saat ini
+  // Simulate sound level for visualization
+  double _calculateSoundLevel() {
+    if (!_isListening) return 0.5;
+    // Simulate varying sound levels between 0.5 and 1.0
+    return 0.5 + (math.Random().nextDouble() * 0.5);
+  }
 }
 
 class SiriLogoWidgetV2 extends StatelessWidget {
   final double animationValue;
+  final double soundLevel;
 
   const SiriLogoWidgetV2({
     super.key,
     required this.animationValue,
     required bool isActive,
+    this.soundLevel = 0.5, // Default sound level jika tidak ada input suara
   });
 
   @override
@@ -2773,6 +2835,7 @@ class SiriLogoWidgetV2 extends StatelessWidget {
                     animationValue: animationValue,
                     innerDiameter: innerDiameter,
                     outerDiameter: outerDiameter,
+                    soundLevel: soundLevel, // Mengirim level suara ke painter
                   ),
                 ),
                 Container(
@@ -2812,11 +2875,13 @@ class SiriLogoPainter2 extends CustomPainter {
   final double animationValue;
   final double innerDiameter;
   final double outerDiameter;
+  final double soundLevel;
 
   SiriLogoPainter2({
     required this.animationValue,
     required this.innerDiameter,
     required this.outerDiameter,
+    this.soundLevel = 0.5, // Default sound level
   });
 
   @override
@@ -2824,18 +2889,31 @@ class SiriLogoPainter2 extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final minRadius = innerDiameter / 2;
     final maxRadius = outerDiameter / 2;
-    final currentRadius = minRadius + (maxRadius - minRadius) * animationValue;
+
+    // Menghitung radius berdasarkan animasi dan level suara
+    // Gunakan soundLevel untuk memperbesar radius saat suara lebih keras
+    final baseRadius = minRadius + (maxRadius - minRadius) * animationValue;
+
+    // Efek suara yang lebih dinamis - hingga 40% dari rentang radius
+    final soundEffect = (maxRadius - minRadius) * 0.1 * soundLevel;
+    final currentRadius = baseRadius + soundEffect;
+
+    // Tambahkan variasi warna berdasarkan level suara
+    final List<Color> colors = [
+      Colors.purpleAccent,
+      soundLevel > 0.7 ? Colors.pinkAccent : Colors.blueAccent,
+      soundLevel > 0.8 ? Colors.redAccent : Colors.cyanAccent,
+      soundLevel > 0.9 ? Colors.orangeAccent : Colors.greenAccent,
+      Colors.purpleAccent,
+    ];
+
+    // Kecepatan rotasi meningkat dengan level suara
+    final rotationSpeed = 2.0 + (soundLevel * 2.0);
 
     final gradient = SweepGradient(
-      colors: const [
-        Colors.purpleAccent,
-        Colors.blueAccent,
-        Colors.cyanAccent,
-        Colors.greenAccent,
-        Colors.purpleAccent,
-      ],
+      colors: colors,
       stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-      transform: GradientRotation(animationValue * 3.1416 * 2),
+      transform: GradientRotation(animationValue * 3.1416 * rotationSpeed),
     ).createShader(Rect.fromCircle(center: center, radius: currentRadius));
 
     final paint = Paint()
@@ -2849,7 +2927,8 @@ class SiriLogoPainter2 extends CustomPainter {
   bool shouldRepaint(covariant SiriLogoPainter2 oldDelegate) =>
       oldDelegate.animationValue != animationValue ||
       oldDelegate.innerDiameter != innerDiameter ||
-      oldDelegate.outerDiameter != outerDiameter;
+      oldDelegate.outerDiameter != outerDiameter ||
+      oldDelegate.soundLevel != soundLevel;
 }
 
 @HiveType(typeId: 0)
@@ -2992,51 +3071,71 @@ class RegionDrawer extends StatefulWidget {
 }
 
 class _RegionDrawerState extends State<RegionDrawer> {
+  String? selectedRegion;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedRegion();
+  }
+
+  Future<void> _loadSavedRegion() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      selectedRegion = prefs.getString('selectedRegion');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).primaryColor.withOpacity(0.7),
+          Container(
+            width: double.infinity,
+            height: 160,
+            child: DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    Theme.of(context).primaryColor.withOpacity(0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.health_and_safety,
+                    size: 36, // Reduced from 48
+                    color: Colors.white,
+                  ),
+                  SizedBox(height: 8), // Reduced from 12
+                  Text(
+                    'Standar BMI Regional',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18, // Reduced from 20
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Pilih standar yang sesuai dengan region Anda',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11, // Reduced from 12
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
             ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.health_and_safety,
-                  size: 48,
-                  color: Colors.white,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Standar BMI Regional',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  'Pilih standar yang sesuai dengan region Anda',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
           ),
-          Expanded(
+          Flexible(
+            fit: FlexFit.tight,
             child: ListView.builder(
               itemCount: regions.length,
               itemBuilder: (context, index) {
@@ -3086,7 +3185,11 @@ class _RegionDrawerState extends State<RegionDrawer> {
                         color: Colors.grey[600],
                       ),
                     ),
-                    onTap: () {
+                    onTap: () async {
+                      // Save the selected region to SharedPreferences
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('selectedRegion', region.code);
+
                       widget.onRegionSelected(region);
                       Navigator.pop(context);
                     },
@@ -3136,15 +3239,15 @@ class _RegionDrawerState extends State<RegionDrawer> {
       case 'WHO':
         return 'Standar internasional WHO';
       case 'WPRO':
-        return 'Disesuaikan untuk populasi Asia-Pasifik';
+        return 'Disesuaikan untuk Asia-Pasifik';
       case 'CN':
         return 'Standar nasional China';
       case 'JP':
-        return 'Standar JASSO dengan 4 tingkat obesitas';
+        return 'Standar JASSO';
       case 'IN':
-        return 'Kriteria khusus populasi India';
+        return 'Standar nasional India';
       case 'SG':
-        return 'Standar kesehatan Singapura';
+        return 'Standar nasional Singapura';
       default:
         return '';
     }
