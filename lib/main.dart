@@ -11,7 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:logger/logger.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_tts/flutter_tts.dart'; // Tambahkan dependency ini
+import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:math' as math;
 
 void main() async {
@@ -161,9 +161,13 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   Future<void> _loadSavedRegion() async {
     final prefs = await SharedPreferences.getInstance();
     String? savedRegion = prefs.getString('selectedRegion');
-    if (savedRegion != null) {
-      // Gunakan savedRegion sesuai kebutuhan
-      // Misalnya update state atau panggil widget.onRegionSelected
+    if (savedRegion != null && bmiStandards.containsKey(savedRegion)) {
+      setState(() {
+        selectedRegion = savedRegion;
+      });
+    } else {
+      // Jika belum ada, simpan default (WPRO)
+      await prefs.setString('selectedRegion', selectedRegion);
     }
   }
 
