@@ -2352,6 +2352,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         text,
         style: const TextStyle(
           fontWeight: FontWeight.bold,
+          fontStyle: FontStyle.italic,
           color: Colors.purple,
           fontSize: 11,
         ),
