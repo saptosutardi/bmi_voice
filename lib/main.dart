@@ -187,11 +187,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   String get _weightUnit => _isMetric ? 'kg' : 'lbs';
   String get _heightUnit => _isMetric ? 'cm' : 'in';
 
-  double get _weightDisplay =>
-      _weightKg != null ? (_isMetric ? _weightKg! : _weightKg! * 2.20462) : 0.0;
-  double get _heightDisplay =>
-      _heightCm != null ? (_isMetric ? _heightCm! : _heightCm! / 2.54) : 0.0;
-
   String _formatNumber(double value) {
     if ((value % 1).abs() < 0.0001) {
       return value.toStringAsFixed(0);
@@ -898,7 +893,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                           child: Text('Bahasa Indonesia'),
                         ),
                       ],
-                      onChanged: (value) {
+                      onChanged: (value) async {
                         if (value != null) {
                           final bool newEnglishValue = value == 'English';
                           setDialogState(() {
@@ -909,6 +904,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                             _tts.setLanguage(
                                 newEnglishValue ? 'en-US' : 'id-ID');
                           });
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('isEnglish', newEnglishValue);
                         }
                       },
                     ),
@@ -953,7 +950,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                           child: Text('Imperial (lbs, in)'),
                         ),
                       ],
-                      onChanged: (value) {
+                      onChanged: (value) async {
                         if (value != null) {
                           final bool newMetricValue =
                               value == 'Metric (kg, cm)';
@@ -963,6 +960,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                           setState(() {
                             _isMetric = newMetricValue;
                           });
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('isMetric', newMetricValue);
                         }
                       },
                     ),
@@ -993,13 +992,15 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                         Text(_isEnglish ? 'Enable Beep' : 'Aktifkan Beep'),
                         Switch(
                           value: _isBeepEnabled,
-                          onChanged: (value) {
+                          onChanged: (value) async {
                             setDialogState(() {
                               _isBeepEnabled = value;
                             });
                             setState(() {
                               _isBeepEnabled = value;
                             });
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('isBeepEnabled', value);
                           },
                         ),
                       ],
@@ -1036,7 +1037,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                           divisions: 10,
                           label:
                               '${(_beepVolume * 100).round()}%', // Tambahkan tanda %
-                          onChanged: (value) {
+                          onChanged: (value) async {
                             setDialogState(() {
                               _beepVolume = value;
                             });
@@ -1045,6 +1046,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                               _audioPlayer.setVolume(value *
                                   1.5); // Tambahkan amplifikasi saat testing
                             });
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setDouble('beepVolume', value);
                           },
                         ),
                       ),
@@ -1250,17 +1253,16 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         onRegionSelected: (RegionData region) {
           setState(() {
             selectedRegion = region.code;
-            // Di sini Anda bisa menambahkan logika untuk mengupdate
-            // perhitungan BMI berdasarkan standar yang baru
           });
         },
+        isEnglish: _isEnglish, // Add this
       ),
     );
   }
 
   Widget _buildInitiateInstruction() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+      padding: const EdgeInsets.all(0), // Add appropriate padding here
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),
         decoration: BoxDecoration(
@@ -2033,6 +2035,23 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                     }),
                   ),
                 ),
+                // garis putih
+                Positioned(
+                    left: _calculateArrowPositionWithFlex(
+                      bmi: _bmi!,
+                      gaugeWidth: gaugeWidth,
+                      thresholds: thresholds.map((t) => t.toDouble()).toList(),
+                      flexValues: flexValues,
+                      pixelsPerFlex: pixelsPerFlex,
+                    ),
+                    bottom: -3,
+                    child: Icon(
+                      Icons.straight,
+                      size: 24,
+                      color: Colors.white,
+                    )),
+
+                // garis segitiga ke bawah
                 Positioned(
                   left: _calculateArrowPositionWithFlex(
                     bmi: _bmi!,
@@ -2083,21 +2102,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                     ),
                   );
                 }),
-                Positioned(
-                  left: _calculateArrowPositionWithFlex(
-                    bmi: _bmi!,
-                    gaugeWidth: gaugeWidth,
-                    thresholds: thresholds.map((t) => t.toDouble()).toList(),
-                    flexValues: flexValues,
-                    pixelsPerFlex: pixelsPerFlex,
-                  ),
-                  bottom: -16,
-                  child: Icon(
-                    Icons.arrow_drop_up,
-                    size: 24,
-                    color: Colors.red[800],
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -2342,8 +2346,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   Widget _buildTableHeader(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+    return Container(
+      padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
       child: Text(
         text,
         style: const TextStyle(
@@ -3063,11 +3067,13 @@ final List<RegionData> regions = [
 class RegionDrawer extends StatefulWidget {
   final String selectedRegion;
   final Function(RegionData) onRegionSelected;
+  final bool isEnglish; // Add this
 
   const RegionDrawer({
     Key? key,
     required this.selectedRegion,
     required this.onRegionSelected,
+    required this.isEnglish, // Add this
   }) : super(key: key);
 
   @override
@@ -3097,7 +3103,7 @@ class _RegionDrawerState extends State<RegionDrawer> {
         children: [
           Container(
             width: double.infinity,
-            height: 160,
+            height: 150,
             child: DrawerHeader(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -3109,28 +3115,32 @@ class _RegionDrawerState extends State<RegionDrawer> {
                   end: Alignment.bottomRight,
                 ),
               ),
-              child: const Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.health_and_safety,
-                    size: 36, // Reduced from 48
+                    size: 36,
                     color: Colors.white,
                   ),
-                  SizedBox(height: 8), // Reduced from 12
+                  const SizedBox(height: 8),
                   Text(
-                    'Standar BMI Regional',
-                    style: TextStyle(
+                    widget.isEnglish
+                        ? 'Regional BMI Standards'
+                        : 'Standar BMI Regional',
+                    style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18, // Reduced from 20
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
-                    'Pilih standar yang sesuai dengan region Anda',
+                    widget.isEnglish
+                        ? 'Choose the standard that matches your region'
+                        : 'Pilih standar yang sesuai dengan region Anda',
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 11, // Reduced from 12
+                      fontSize: 11,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -3147,7 +3157,8 @@ class _RegionDrawerState extends State<RegionDrawer> {
                 final isSelected = region.code == widget.selectedRegion;
 
                 return Container(
-                  margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: isSelected
@@ -3208,9 +3219,12 @@ class _RegionDrawerState extends State<RegionDrawer> {
               },
             ),
           ),
-          Divider(),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.0),
+            child: Divider(height: 1, thickness: 1),
+          ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -3222,7 +3236,9 @@ class _RegionDrawerState extends State<RegionDrawer> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Standar BMI akan mempengaruhi kategori dan rekomendasi yang diberikan',
+                    widget.isEnglish
+                        ? 'BMI standards will affect the categories and recommendations given'
+                        : 'Standar BMI akan mempengaruhi kategori dan rekomendasi yang diberikan',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -3241,17 +3257,27 @@ class _RegionDrawerState extends State<RegionDrawer> {
   String _getRegionDescription(RegionData region) {
     switch (region.code) {
       case 'WHO':
-        return 'Standar internasional WHO';
+        return widget.isEnglish
+            ? 'WHO international standard'
+            : 'Standar internasional WHO';
       case 'WPRO':
-        return 'Disesuaikan untuk Asia-Pasifik';
+        return widget.isEnglish
+            ? 'Adapted for Asia-Pacific'
+            : 'Disesuaikan untuk Asia-Pasifik';
       case 'CN':
-        return 'Standar nasional China';
+        return widget.isEnglish
+            ? 'China national standard'
+            : 'Standar nasional China';
       case 'JP':
-        return 'Standar JASSO';
+        return widget.isEnglish ? 'JASSO standard' : 'Standar JASSO';
       case 'IN':
-        return 'Standar nasional India';
+        return widget.isEnglish
+            ? 'India national standard'
+            : 'Standar nasional India';
       case 'SG':
-        return 'Standar nasional Singapura';
+        return widget.isEnglish
+            ? 'Singapore national standard'
+            : 'Standar nasional Singapura';
       default:
         return '';
     }
