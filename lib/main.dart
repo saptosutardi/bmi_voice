@@ -74,7 +74,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   final FlutterTts _tts = FlutterTts(); // Inisialisasi TTS
 
   // Dialog style constants
-  final _dialogTitleStyle = TextStyle(color: Colors.black);
+  final _dialogTitleStyle = const TextStyle(color: Colors.black);
   final _textButtonStyle = TextButton.styleFrom(
     foregroundColor: Colors.purple[800],
   );
@@ -208,7 +208,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   Future<bool> _checkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
-    return connectivityResult != ConnectivityResult.none;
+    return connectivityResult.contains(ConnectivityResult.mobile) ||
+        connectivityResult.contains(ConnectivityResult.wifi) ||
+        connectivityResult.contains(ConnectivityResult.ethernet);
   }
 
   Future<void> _checkSpeechAvailability() async {
@@ -555,7 +557,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             content: Text(
               '${_isEnglish ? 'Error' : 'Kesalahan'}: $e',
             ),
-            margin: EdgeInsets.only(
+            margin: const EdgeInsets.only(
               bottom: 100.0,
               left: 16.0,
               right: 16.0,
@@ -610,7 +612,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   _recognizedWords = '';
                   _speech.cancel();
                 });
-                Future.delayed(Duration(milliseconds: 500), () {
+                Future.delayed(const Duration(milliseconds: 500), () {
                   if (mounted) {
                     _startListening();
                   }
@@ -708,7 +710,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           backgroundColor: Colors.purple[800],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
-          margin: EdgeInsets.only(
+          margin: const EdgeInsets.only(
             bottom: 100.0,
             left: 16.0,
             right: 16.0,
@@ -740,7 +742,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   onPressed: _startListening,
                 )
               : null,
-          margin: EdgeInsets.only(
+          margin: const EdgeInsets.only(
             bottom: 100.0,
             left: 16.0,
             right: 16.0,
@@ -877,13 +879,13 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                     child: DropdownButtonFormField<String>(
                       value: _isEnglish ? 'English' : 'Bahasa Indonesia',
                       decoration: InputDecoration(
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      items: [
+                      items: const [
                         DropdownMenuItem(
                           value: 'English',
                           child: Text('English'),
@@ -912,9 +914,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   ),
 
                   // Divider
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Divider(color: Colors.purple[200]),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Units Section
                   Padding(
@@ -934,13 +936,13 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                       value:
                           _isMetric ? 'Metric (kg, cm)' : 'Imperial (lbs, in)',
                       decoration: InputDecoration(
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      items: [
+                      items: const [
                         DropdownMenuItem(
                           value: 'Metric (kg, cm)',
                           child: Text('Metric (kg, cm)'),
@@ -968,9 +970,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   ),
 
                   // Divider
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Divider(color: Colors.purple[200]),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Beep Sound Section
                   Padding(
@@ -1009,12 +1011,12 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
                   // Volume Section (only shown if beep is enabled)
                   if (_isBeepEnabled) ...[
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: Text(
                         _isEnglish ? 'Beep Volume' : 'Volume Beep',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1025,10 +1027,10 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           trackHeight: 4.0,
-                          thumbShape:
-                              RoundSliderThumbShape(enabledThumbRadius: 8.0),
-                          overlayShape:
-                              RoundSliderOverlayShape(overlayRadius: 16.0),
+                          thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 8.0),
+                          overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 16.0),
                         ),
                         child: Slider(
                           value: _beepVolume,
@@ -1121,7 +1123,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                             backgroundColor: Colors.purple[800],
                             behavior: SnackBarBehavior.floating,
                             duration: const Duration(seconds: 2),
-                            margin: EdgeInsets.only(
+                            margin: const EdgeInsets.only(
                               bottom: 100.0,
                               left: 16.0,
                               right: 16.0,
@@ -1559,7 +1561,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             children: [
               Text(
                 title,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               Icon(
                 Icons.record_voice_over_outlined,
@@ -1593,14 +1596,14 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         children: [
           Text(
             title,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 4),
           Text(
             _isEnglish
                 ? 'Data entered manually'
                 : 'Data telah dimasukkan secara manual',
-            style: TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 14),
           ),
         ],
       );
@@ -1621,7 +1624,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             ),
           ),
         );
-        textSpans.add(TextSpan(text: ' '));
+        textSpans.add(const TextSpan(text: ' '));
         textSpans.add(
           TextSpan(
             text: '${_formatCleanNumber(_weightKg!)} kg',
@@ -1650,7 +1653,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             children: [
               Text(
                 title,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               Stack(
                 alignment: Alignment.center,
@@ -1658,7 +1662,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   Container(
                     width: 24,
                     height: 24,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
@@ -1766,7 +1770,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               ],
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             '|',
             style: TextStyle(
@@ -1774,7 +1778,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               color: Colors.purple[800],
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           RichText(
             text: TextSpan(
               children: [
@@ -1818,8 +1822,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     final double segmentWidth = gaugeWidth / 5;
     const double gaugeFontSize = 9.0;
 
-    final double arrowPosition =
-        _calculateArrowPosition(_bmi!, gaugeWidth, segmentWidth);
+    _calculateArrowPosition(_bmi!, gaugeWidth, segmentWidth);
 
     return Container(
       padding: const EdgeInsets.all(6),
@@ -1992,11 +1995,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   width: gaugeWidth,
                   child: Row(
                     children: List.generate(categories.length, (index) {
-                      final startValue =
-                          index == 0 ? 0.0 : thresholds[index - 1].toDouble();
-                      final endValue = index < thresholds.length
-                          ? thresholds[index].toDouble()
-                          : double.infinity;
                       final color = colors[index];
 
                       return Expanded(
@@ -2045,7 +2043,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                       pixelsPerFlex: pixelsPerFlex,
                     ),
                     bottom: -3,
-                    child: Icon(
+                    child: const Icon(
                       Icons.straight,
                       size: 24,
                       color: Colors.white,
@@ -2220,10 +2218,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   Widget _buildBMIClassificationTable() {
     final standard = bmiStandards[selectedRegion]!;
-    final thresholds = standard.thresholds;
-    final categories = standard.categories;
-    final colors = standard.colors;
-
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -2308,7 +2302,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     const double fontSize = 11;
     return TableRow(
       decoration: BoxDecoration(
-        color: isCurrent ? color.withOpacity(0.1) : null,
+        color: isCurrent ? color.withAlpha((0.1 * 255).toInt()) : null,
       ),
       children: [
         Padding(
@@ -2363,7 +2357,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   Widget _buildCategoryLabel(String title, Color color,
       {bool isCurrent = false}) {
     // Fungsi untuk memisahkan teks menjadi baris yang lebih baik
-    List<String> _splitText(String text) {
+    List<String> splitText(String text) {
       if (text.length <= 8) return [_toTitleCase(text)];
 
       // Daftar kata-kata majemuk yang umum dalam kategori BMI
@@ -2413,7 +2407,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       ];
     }
 
-    final lines = _splitText(title);
+    final lines = splitText(title);
 
     return GestureDetector(
       onTap: isCurrent
@@ -2630,16 +2624,16 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       onTap: _showManualInputDialog,
       child: Container(
         padding: const EdgeInsets.all(4),
-        child: Column(
+        child: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.keyboard,
               color: Colors.deepPurple,
               size: 24,
             ),
-            const SizedBox(height: 1),
-            const Text(
+            SizedBox(height: 1),
+            Text(
               'Manual',
               style: TextStyle(
                 color: Colors.deepPurple,
@@ -2850,14 +2844,14 @@ class SiriLogoWidgetV2 extends StatelessWidget {
                 Container(
                   width: innerDiameter,
                   height: innerDiameter,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
                   ),
                   child: Center(
                     child: ShaderMask(
                       shaderCallback: (bounds) {
-                        return LinearGradient(
+                        return const LinearGradient(
                           colors: [Colors.deepPurple, Colors.purpleAccent],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -3102,7 +3096,7 @@ class _RegionDrawerState extends State<RegionDrawer> {
     return Drawer(
       child: Column(
         children: [
-          Container(
+          SizedBox(
             width: double.infinity,
             height: 150,
             child: DrawerHeader(
@@ -3110,7 +3104,9 @@ class _RegionDrawerState extends State<RegionDrawer> {
                 gradient: LinearGradient(
                   colors: [
                     Theme.of(context).primaryColor,
-                    Theme.of(context).primaryColor.withOpacity(0.7),
+                    Theme.of(context)
+                        .primaryColor
+                        .withAlpha((0.7 * 255).toInt()),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -3139,7 +3135,7 @@ class _RegionDrawerState extends State<RegionDrawer> {
                     widget.isEnglish
                         ? 'Choose the standard that matches your region'
                         : 'Pilih standar yang sesuai dengan region Anda',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 11,
                     ),
@@ -3163,7 +3159,9 @@ class _RegionDrawerState extends State<RegionDrawer> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: isSelected
-                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                        ? Theme.of(context)
+                            .primaryColor
+                            .withAlpha((0.1 * 255).toInt())
                         : null,
                   ),
                   child: ListTile(
@@ -3173,8 +3171,10 @@ class _RegionDrawerState extends State<RegionDrawer> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isSelected
-                            ? Theme.of(context).primaryColor.withOpacity(0.2)
-                            : Colors.grey.withOpacity(0.1),
+                            ? Theme.of(context)
+                                .primaryColor
+                                .withAlpha((0.2 * 255).toInt())
+                            : Colors.grey.withAlpha((0.1 * 255).toInt()),
                       ),
                       child: Icon(
                         region.icon,
@@ -3234,7 +3234,7 @@ class _RegionDrawerState extends State<RegionDrawer> {
                   size: 16,
                   color: Colors.grey[600],
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     widget.isEnglish
