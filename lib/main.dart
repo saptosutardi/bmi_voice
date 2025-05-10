@@ -13,6 +13,8 @@ import 'package:logger/logger.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:math' as math;
+import 'bmi_standards.dart';
+import 'siri_logo_painter2.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,7 +63,6 @@ class MyApp extends StatelessWidget {
 class VoiceBMIPage extends StatefulWidget {
   const VoiceBMIPage({super.key});
 
-  @override
   VoiceBMIPageState createState() => VoiceBMIPageState();
 }
 
@@ -405,14 +406,16 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
               : null;
 
           // Step 2: Validasi dan konversi tinggi badan
+
           if (_isHeightToken(nextToken) || _isHeightKeyword(prevToken)) {
             double convertedHeight = _convertToHeight(value, nextToken);
-            if (_isValidHeight(convertedHeight)) {
+            // Ganti validasi tinggi dari 120-250 ke 50-250 agar konsisten dengan input manual
+            if (convertedHeight >= 50 && convertedHeight <= 250) {
               height = convertedHeight;
             } else {
               _showError(_isEnglish
-                  ? "Height must be 120-250 cm"
-                  : "Tinggi harus 120-250 cm");
+                  ? "Height must be 50-250 cm"
+                  : "Tinggi harus 50-250 cm");
               return;
             }
           }
@@ -2178,7 +2181,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   Widget _buildRiskTable() {
     // Tingkatkan nilai default minimum untuk tinggi tabel
-    const double defaultMinHeight = 170.0;
+    const double defaultMinHeight = 90.0;
     const double extraPadding = 16.0;
 
     return ClipRect(
@@ -2236,7 +2239,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           columnWidths: const {
             0: FlexColumnWidth(2.0),
             1: FlexColumnWidth(1.5),
-            2: FlexColumnWidth(1.5),
+            2: FlexColumnWidth(1.8),
           },
           children: [
             TableRow(
@@ -2428,13 +2431,17 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ...lines.map((line) => Text(
-                  line,
-                  textAlign: TextAlign.center,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            ...lines.map((line) => Align(
+                  alignment: Alignment.topCenter,
+                  child: Text(
+                    line,
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                    style: GoogleFonts.roboto(
+                      fontSize: 8,
+                      fontWeight:
+                          isCurrent ? FontWeight.bold : FontWeight.normal,
+                    ),
                   ),
                 )),
             SizedBox(
@@ -2834,7 +2841,7 @@ class SiriLogoWidgetV2 extends StatelessWidget {
               children: [
                 CustomPaint(
                   size: Size(outerDiameter, outerDiameter),
-                  painter: SiriLogoPainter2(
+                  painter: SiriLogoPainter(
                     animationValue: animationValue,
                     innerDiameter: innerDiameter,
                     outerDiameter: outerDiameter,
@@ -3098,7 +3105,7 @@ class _RegionDrawerState extends State<RegionDrawer> {
         children: [
           SizedBox(
             width: double.infinity,
-            height: 150,
+            height: 170,
             child: DrawerHeader(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -3284,98 +3291,3 @@ class _RegionDrawerState extends State<RegionDrawer> {
     }
   }
 }
-
-class BMIThresholds {
-  final String name;
-  final List<double> thresholds;
-  final List<String> categories;
-  final List<Color> colors;
-
-  BMIThresholds({
-    required this.name,
-    required this.thresholds,
-    required this.categories,
-    required this.colors,
-  });
-}
-
-final Map<String, BMIThresholds> bmiStandards = {
-  'WHO': BMIThresholds(
-    name: 'WHO (Global)',
-    thresholds: [18.5, 25.0, 30.0, 35.0, 40.0],
-    categories: [
-      'Underweight',
-      'Normal',
-      'Overweight',
-      'Obese I',
-      'Obese II',
-      'Obese III'
-    ],
-    colors: [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.red,
-      Colors.red[700]!,
-      Colors.red[900]!
-    ],
-  ),
-  'WPRO': BMIThresholds(
-    name: 'Asia-Pasifik (WPRO)',
-    thresholds: [18.5, 23.0, 25.0, 30.0],
-    categories: ['Underweight', 'Normal', 'Overweight', 'Obese I', 'Obese II'],
-    colors: [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.red,
-      Colors.red[900]!
-    ],
-  ),
-  'CN': BMIThresholds(
-    name: 'China (WGOC)',
-    thresholds: [18.5, 24.0, 28.0],
-    categories: ['Underweight', 'Normal', 'Overweight', 'Obese'],
-    colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
-  ),
-  'JP': BMIThresholds(
-    name: 'Japan (JASSO)',
-    thresholds: [18.5, 23.0, 25.0, 30.0, 35.0, 40.0],
-    categories: [
-      'Underweight',
-      'Normal',
-      'Pre-obese',
-      'Obese I',
-      'Obese II',
-      'Obese III',
-      'Obese IV'
-    ],
-    colors: [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.deepOrange,
-      Colors.red,
-      Colors.red[700]!,
-      Colors.red[900]!
-    ],
-  ),
-  'IN': BMIThresholds(
-    name: 'India',
-    thresholds: [18.5, 23.0, 25.0, 30.0],
-    categories: ['Underweight', 'Normal', 'Overweight', 'Obese I', 'Obese II'],
-    colors: [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.red,
-      Colors.red[900]!
-    ],
-  ),
-  'SG': BMIThresholds(
-    name: 'Singapore',
-    thresholds: [18.5, 23.0, 27.5],
-    categories: ['Underweight', 'Normal', 'Overweight', 'Obese'],
-    colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
-  ),
-};
