@@ -9,7 +9,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:logger/logger.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:math' as math;
@@ -68,7 +67,6 @@ class VoiceBMIPage extends StatefulWidget {
 
 class VoiceBMIPageState extends State<VoiceBMIPage>
     with SingleTickerProviderStateMixin {
-  final Logger _logger = Logger();
   final stt.SpeechToText _speech = stt.SpeechToText();
   final Box<BMIRecord> _historyBox = Hive.box<BMIRecord>('bmiHistory');
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -105,6 +103,11 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   bool _showClassification = false;
   bool _isSavedInSession = false;
   String _recognizedWords = '';
+
+  double? _parsedHeightValueForDisplay;
+  String? _parsedHeightUnitForDisplay;
+  double? _parsedWeightValueForDisplay;
+  String? _parsedWeightUnitForDisplay;
 
   bool _isSelectMode = false;
   final Map<int, bool> _selectedItems = {};
@@ -217,7 +220,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   Future<void> _checkSpeechAvailability() async {
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
-      _logger.i('Microphone permission denied');
       _showError(_isEnglish
           ? 'Microphone permission required'
           : 'Izin mikrofon diperlukan');
@@ -227,7 +229,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
     final isConnected = await _checkConnectivity();
     if (!isConnected) {
-      _logger.i('No internet connection');
       _showError(_isEnglish
           ? 'No internet connection. Speech recognition requires internet.'
           : 'Tidak ada koneksi internet. Pengenalan suara memerlukan internet.');
@@ -236,26 +237,23 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     }
 
     final isAvailable = await _speech.initialize(
-      onStatus: (status) => _logger.i('Speech status: $status'),
+      // onStatus: (status) => _logger.i('Speech status: $status'),
+      // onStatus: (status) => print('Speech status: $status'), // Ganti logger dengan print jika perlu
       onError: (error) {
         String errorMessage = error.errorMsg.contains('network')
             ? (_isEnglish
                 ? 'Network error: Please check your internet connection.'
                 : 'Kesalahan jaringan: Silakan periksa koneksi internet Anda.')
             : '${_isEnglish ? 'Error' : 'Kesalahan'}: ${error.errorMsg}';
-        _logger.e('Speech error: ${error.errorMsg}');
         _showError(errorMessage);
       },
     );
-
     if (mounted) {
-      _logger.i('Speech available: $isAvailable');
       setState(() => _isSpeechAvailable = isAvailable);
     }
   }
 
   Future<void> _startListening() async {
-    _logger.i('Starting listening process');
     if (!_isSpeechAvailable) {
       _showError(_isEnglish
           ? 'Speech recognition not available. Please try again.'
@@ -277,7 +275,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             .setVolume(_beepVolume * 1.5); // Tambahkan amplifikasi 1.5x
         await _audioPlayer.play(AssetSource('sounds/start_beep.mp3'));
       } catch (e) {
-        _logger.e('Error playing sound: $e');
+        // _logger.e('Error playing sound: $e');
       }
     }
 
@@ -291,6 +289,10 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       _showInstruction = false;
       _isDataConfirmed = false;
       _isSavedInSession = false;
+      _parsedHeightValueForDisplay = null;
+      _parsedHeightUnitForDisplay = null;
+      _parsedWeightValueForDisplay = null;
+      _parsedWeightUnitForDisplay = null;
     });
 
     _speech.listen(
@@ -298,7 +300,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         if (mounted) {
           setState(() {
             _recognizedWords = result.recognizedWords;
-            _extractData(result.recognizedWords);
+            _extractData(result.recognizedWords, isFinalAttempt: false);
           });
         }
         if (result.finalResult) {
@@ -320,7 +322,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             _audioPlayer.setVolume(_beepVolume);
             _audioPlayer.play(AssetSource('sounds/end_beep.mp3'));
           } catch (e) {
-            _logger.e('Error playing end sound on timeout: $e');
+            // _logger.e('Error playing end sound on timeout: $e');
           }
         }
       }
@@ -334,9 +336,12 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   void _processSpeech(String text) {
-    _extractData(text);
+    // Panggil _extractData. Kita akan menggunakan nilai state yang diperbarui olehnya.
+    // _extractData akan memanggil setState secara internal.
+    _extractData(text, isFinalAttempt: true);
 
-    _logger.i('Status setelah ekstraksi: tinggi=$_heightCm, berat=$_weightKg');
+    // Setelah _extractData selesai dan setState-nya (semoga) telah diproses,
+    // kita periksa _heightCm dan _weightKg dari state.
 
     if (_heightCm != null && _weightKg != null) {
       if (mounted) {
@@ -351,7 +356,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             _audioPlayer.setVolume(_beepVolume);
             _audioPlayer.play(AssetSource('sounds/end_beep.mp3'));
           } catch (e) {
-            _logger.e('Error playing end sound on success: $e');
+            // _logger.e('Error playing end sound on success: $e');
           }
         }
       }
@@ -367,23 +372,26 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             _audioPlayer.setVolume(_beepVolume);
             _audioPlayer.play(AssetSource('sounds/end_beep.mp3'));
           } catch (e) {
-            _logger.e('Error playing end sound on incomplete: $e');
+            // _logger.e('Error playing end sound on incomplete: $e');
           }
         }
-        _logger.i('Data tidak lengkap, proses dihentikan');
       }
     }
   }
 
-  void _extractData(String text) {
-    if (_isDataConfirmed) return;
+  void _extractData(String text, {bool isFinalAttempt = false}) {
+    if (_isDataConfirmed && !isFinalAttempt)
+      return; // Allow re-extraction for final attempt if needed, but generally avoid if confirmed.
+
+    double? localParsedHeightValueForDisplay;
+    String? localParsedHeightUnitForDisplay;
+    double? localParsedWeightValueForDisplay;
+    String? localParsedWeightUnitForDisplay;
 
     try {
-      _logger.i('Input suara mentah: $text');
       List<String> tokens = text.toLowerCase().split(' ');
-      double? height;
-      double? weight;
-
+      double? height; // Variabel lokal untuk tinggi
+      double? weight; // Variabel lokal untuk berat
       // Penanda koreksi
       final correctionMarkers = ['eh', 'maksud', 'saya', 'bukan', 'sorry'];
 
@@ -408,6 +416,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           // Step 2: Validasi dan konversi tinggi badan
 
           if (_isHeightToken(nextToken) || _isHeightKeyword(prevToken)) {
+            localParsedHeightValueForDisplay = value;
+            localParsedHeightUnitForDisplay =
+                _isHeightToken(nextToken) ? nextToken : null;
             double convertedHeight = _convertToHeight(value, nextToken);
             // Ganti validasi tinggi dari 120-250 ke 50-250 agar konsisten dengan input manual
             if (convertedHeight >= 50 && convertedHeight <= 250) {
@@ -422,6 +433,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
           // Step 3: Validasi dan konversi berat badan
           if (_isWeightToken(nextToken) || _isWeightKeyword(prevToken)) {
+            localParsedWeightValueForDisplay = value;
+            localParsedWeightUnitForDisplay =
+                _isWeightToken(nextToken) ? nextToken : null;
             double convertedWeight = _convertToWeight(value, nextToken);
             if (_isValidWeight(convertedWeight)) {
               weight = convertedWeight;
@@ -442,19 +456,38 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             .map((t) => double.parse(t.replaceAll(',', '.')))
             .toList();
         if (numbers.length == 2) {
-          double firstNum = numbers[0] > numbers[1] ? numbers[0] : numbers[1];
-          double secondNum = numbers[0] > numbers[1] ? numbers[1] : numbers[0];
+          if (isFinalAttempt) {
+            // Only proceed with dialog/error on final attempt
+            double firstNum = numbers[0] > numbers[1]
+                ? numbers[0]
+                : numbers[1]; // Asumsi angka lebih besar adalah tinggi
+            double secondNum = numbers[0] > numbers[1]
+                ? numbers[1]
+                : numbers[0]; // Asumsi angka lebih kecil adalah berat
 
-          // Validasi sebelum menampilkan dialog
-          if (_isValidHeight(firstNum) && _isValidWeight(secondNum)) {
-            _showClarificationDialog(firstNum, secondNum);
-            return;
-          } else {
-            _showError(_isEnglish
-                ? "Invalid height or weight values"
-                : "Nilai tinggi atau berat tidak valid");
-            return;
+            // Validasi sebelum menampilkan dialog
+            if (_isValidHeight(firstNum) && _isValidWeight(secondNum)) {
+              _showClarificationDialog(firstNum, secondNum);
+              return; // Dialog akan menangani konfirmasi atau pengulangan
+            } else {
+              // Jika bahkan setelah upaya final, dua angka tidak membentuk pasangan tinggi/berat yang valid
+              _showError(_isEnglish
+                  ? "Could not determine height/weight from the numbers. Please include units or keywords like 'height' or 'weight'."
+                  : "Tidak dapat menentukan tinggi/berat dari angka yang disebutkan. Harap sertakan satuan atau kata kunci seperti 'tinggi' atau 'berat'.");
+              return;
+            }
           }
+          // Jika bukan final attempt, dan ada dua angka tanpa konteks,
+          // biarkan saja. Mungkin hasil suara berikutnya akan lebih lengkap dengan satuan/kata kunci.
+          // Variabel height dan weight lokal akan tetap null untuk pemanggilan _extractData ini.
+        } else if (isFinalAttempt &&
+            numbers.isNotEmpty &&
+            (height == null ||
+                weight ==
+                    null) && // Salah satu dari height/weight dari Step 1-3 masih null
+            !(height == null && weight == null && numbers.length != 2)) {
+          // Kasus: satu data terdeteksi dengan kata kunci/satuan, tapi data lainnya tidak. Misal "tinggi 170" tanpa berat.
+          // Biarkan _processSpeech menangani ini sebagai data tidak lengkap.
         }
       }
 
@@ -463,11 +496,20 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         setState(() {
           _heightCm = height;
           _weightKg = weight;
-          _logger.i('Data disimpan: tinggi=$_heightCm cm, berat=$_weightKg kg');
+
+          if (height != null) {
+            _parsedHeightValueForDisplay = localParsedHeightValueForDisplay;
+            _parsedHeightUnitForDisplay = localParsedHeightUnitForDisplay;
+          }
+
+          if (weight != null) {
+            _parsedWeightValueForDisplay = localParsedWeightValueForDisplay;
+            _parsedWeightUnitForDisplay = localParsedWeightUnitForDisplay;
+          }
         });
       }
     } catch (e) {
-      _logger.e('Error ekstraksi: $e');
+      // _logger.e('[_extractData] Error ekstraksi: $e');
       if (!_isDataConfirmed) {
         _showError(_isEnglish
             ? 'Error processing input'
@@ -478,61 +520,76 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
   // Helper methods untuk validasi
   bool _isHeightToken(String? token) {
-    return token == 'cm' ||
-        token == 'sentimeter' ||
-        token == 'm' ||
-        token == 'meter' ||
-        token == 'inches' ||
-        token == 'in';
+    final lowerToken = token?.toLowerCase();
+    return lowerToken == 'cm' ||
+        lowerToken == 'sentimeter' ||
+        lowerToken == 'm' || // meter
+        lowerToken == 'meter' ||
+        lowerToken == 'inches' ||
+        lowerToken == 'inch' || // <<< Tambahkan ini
+        lowerToken == 'in' ||
+        lowerToken == 'inchi';
   }
 
   bool _isHeightKeyword(String? token) {
-    return token == 'tinggi' ||
-        token == 'height' ||
-        token == 'tb' ||
-        token == 'tall';
+    final lowerToken = token?.toLowerCase();
+    return lowerToken == 'tinggi' ||
+        lowerToken == 'height' ||
+        lowerToken == 'tb' ||
+        lowerToken == 'tall';
   }
 
   bool _isWeightToken(String? token) {
-    return token == 'kg' ||
-        token == 'kilo' ||
-        token == 'lbs' ||
-        token == 'pounds';
+    final lowerToken = token?.toLowerCase();
+    return lowerToken == 'kg' ||
+        lowerToken == 'kilo' ||
+        lowerToken == 'lbs' ||
+        lowerToken == 'pounds';
   }
 
   bool _isWeightKeyword(String? token) {
-    return token == 'berat' ||
-        token == 'weight' ||
-        token == 'bb' ||
-        token == 'mass';
+    final lowerToken = token?.toLowerCase();
+    return lowerToken == 'berat' ||
+        lowerToken == 'weight' ||
+        lowerToken == 'bb' ||
+        lowerToken == 'mass';
   }
 
   double _convertToHeight(double value, String? unit) {
+    print('--> _convertToHeight = $value, unit = $unit');
+    final lowerUnit = unit?.toLowerCase();
     // Konversi meter ke cm terlebih dahulu
-    if (unit == 'm' || unit == 'meter') {
+    if (lowerUnit == 'm' || lowerUnit == 'meter') {
       return value * 100;
-    } else if (unit == 'inches' || unit == 'in') {
+    } else if (lowerUnit == 'inches' ||
+        lowerUnit == 'inch' || // <<< Tambahkan ini
+        lowerUnit == 'in' ||
+        lowerUnit == 'inchi') {
+      // Ditambahkan 'inchi' dan toLowerCase()
       return value * 2.54;
     }
 
     // Auto-detect meter jika nilai terlalu kecil
-    if (value < 3) {
+    if (value < 3 && unit == null) {
+      // Hanya jika unit tidak ada
       // Asumsi input dalam meter
       return value * 100;
     }
-
     return value; // Asumsi sudah dalam cm
   }
 
   double _convertToWeight(double value, String? unit) {
-    if (unit == 'lbs' || unit == 'pounds') {
+    final lowerUnit = unit?.toLowerCase();
+    if (lowerUnit == 'lbs' || lowerUnit == 'pounds') {
+      // Ditambahkan toLowerCase()
       return value * 0.453592;
     }
     return value; // Assumed kg if no unit or kg unit
   }
 
   bool _isValidHeight(double heightInCm) {
-    return heightInCm >= 120 && heightInCm <= 250;
+    // Konsisten dengan validasi input manual dan ekstraksi suara (Step 2)
+    return heightInCm >= 50 && heightInCm <= 250;
   }
 
   bool _isValidWeight(double weight) {
@@ -553,7 +610,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         });
       }
     } catch (e) {
-      _logger.e('Error saat menghitung BMI: $e');
+      // _logger.e('Error saat menghitung BMI: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -634,6 +691,10 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                   _isDataConfirmed = true;
                   _isListening = false;
                   _showListeningCard = true;
+                  _parsedHeightValueForDisplay = firstNum;
+                  _parsedHeightUnitForDisplay = 'cm';
+                  _parsedWeightValueForDisplay = secondNum;
+                  _parsedWeightUnitForDisplay = 'kg';
                   _showInstruction = false;
                 });
                 _calculateBMI();
@@ -642,7 +703,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                     _audioPlayer.setVolume(_beepVolume);
                     _audioPlayer.play(AssetSource('sounds/end_beep.mp3'));
                   } catch (e) {
-                    _logger.e('Error playing end sound on confirmation: $e');
+                    // _logger.e('Error playing end sound on confirmation: $e');
                   }
                 }
               },
@@ -663,7 +724,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
     if (_historyBox.length >= 100) {
       _historyBox.deleteAt(0);
-      _logger.i("Deleted oldest history entry to maintain limit of 100");
     }
 
     if (_historyBox.isNotEmpty && _historyBox.values.last.bmi == _bmi) {
@@ -686,7 +746,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             FilledButton(
               onPressed: () {
                 _historyBox.add(record);
-                _logger.i("Duplicate BMI saved: $_bmi");
                 Navigator.pop(context);
               },
               style: _filledButtonStyle,
@@ -700,7 +759,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       );
     } else {
       _historyBox.add(record);
-      _logger.i("BMI saved: $_bmi");
       setState(() {
         _isSavedInSession = true;
       });
@@ -1450,9 +1508,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   Widget _buildInputStatusCard() {
-    _logger.i(
-        'Building InputStatusCard, _isListening: $_isListening, _isManualInputActive: $_isManualInputActive, _isDataConfirmed: $_isDataConfirmed');
-
     if (_isShowingDialog) {
       return Container(
         width: double.infinity,
@@ -1484,23 +1539,16 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
 
     if (_isListening) {
       title = _isEnglish ? 'Listening...' : 'Mendengarkan...';
-      final pattern = _isEnglish
-          ? RegExp(
-              r'(height|tall|weight|mass)?\s*(\d+[,.]?\d*)\s*(inches|in|lbs|pounds)?',
-              caseSensitive: false,
-            )
-          : RegExp(
-              r'(tinggi badan|tinggi|tb|berat|bb)?\s*(\d+[,.]?\d*)\s*(cm|sentimeter|kg|kilo|m|meter)?',
-              caseSensitive: false,
-            );
-
-      final matches = pattern.allMatches(_recognizedWords).toList();
+      // Regex universal untuk menangkap kata kunci (Inggris & Indonesia) dan satuan
+      final pattern = RegExp(
+        r'(height|tall|weight|mass|tinggi badan|tinggi|tb|berat|bb)?\s*(\d+[,.]?\d*)\s*(cm|sentimeter|kg|kilo|m|meter|inches|inch|in|inchi|lbs|pounds)?', // Ditambahkan 'inch' dan 'inchi'
+        caseSensitive: false,
+      );
 
       List<TextSpan> textSpans = [];
       String remainingText = _recognizedWords;
       int lastEnd = 0;
-
-      for (var match in matches) {
+      for (final match in pattern.allMatches(_recognizedWords)) {
         final matchedText = match.group(0)!;
         final keyword = match.group(1)?.toLowerCase();
         final unit = match.group(3)?.toLowerCase();
@@ -1513,34 +1561,38 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
           );
         }
 
-        bool isWeight = _isEnglish
-            ? (keyword == 'weight' ||
+        // Menentukan apakah segmen terkait dengan berat (kata kunci atau satuan universal)
+        final bool isWeightRelated = (keyword == 'weight' ||
                 keyword == 'mass' ||
+                keyword == 'berat' ||
+                keyword == 'bb') ||
+            (unit == 'kg' ||
+                unit == 'kilo' ||
                 unit == 'lbs' ||
-                unit == 'pounds')
-            : (keyword == 'berat' ||
-                keyword == 'bb' ||
-                unit == 'kg' ||
-                unit == 'kilo');
-        bool isHeight = _isEnglish
-            ? (keyword == 'height' ||
+                unit == 'pounds');
+
+        // Menentukan apakah segmen terkait dengan tinggi (kata kunci atau satuan universal)
+        final bool isHeightRelated = (keyword == 'height' ||
                 keyword == 'tall' ||
-                unit == 'inches' ||
-                unit == 'in')
-            : (keyword == 'tinggi' ||
+                keyword == 'tinggi' ||
                 keyword == 'tinggi badan' ||
-                keyword == 'tb' ||
-                unit == 'cm' ||
+                keyword == 'tb') ||
+            (unit == 'cm' ||
                 unit == 'sentimeter' ||
                 unit == 'm' ||
-                unit == 'meter');
+                unit == 'meter' ||
+                unit == 'inches' ||
+                unit == 'inch' || // <<< Tambahkan ini
+                unit == 'in' ||
+                unit == 'inchi'); // Ditambahkan 'inchi'
 
         textSpans.add(
           TextSpan(
             text: matchedText,
             style: TextStyle(
-              backgroundColor:
-                  (isWeight || isHeight) ? Colors.yellow[100] : null,
+              backgroundColor: (isWeightRelated || isHeightRelated)
+                  ? Colors.yellow[100]
+                  : null,
             ),
           ),
         );
@@ -1611,32 +1663,47 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         ],
       );
     } else {
-      title = _isEnglish
-          ? 'Confirmed Voice Input'
-          : 'Input dari Suara Terkonfirmasi';
-
+      title = _isEnglish ? 'Confirmed Input' : 'Input Terkonfirmasi';
       List<TextSpan> textSpans = [];
+      print('--> Height: $_heightCm, Weight: $_weightKg');
 
       if (_heightCm != null && _weightKg != null) {
         textSpans.add(
           TextSpan(
             text: '${_formatCleanNumber(_heightCm!)} cm',
-            style: TextStyle(
-              fontSize: 14,
-              backgroundColor: Colors.yellow[100],
-            ),
+            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
           ),
         );
         textSpans.add(const TextSpan(text: ' '));
         textSpans.add(
           TextSpan(
             text: '${_formatCleanNumber(_weightKg!)} kg',
-            style: TextStyle(
-              fontSize: 14,
-              backgroundColor: Colors.yellow[100],
-            ),
+            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
           ),
         );
+      } else if (_parsedHeightValueForDisplay != null &&
+          _parsedWeightValueForDisplay != null) {
+        String heightStr = _formatCleanNumber(_parsedHeightValueForDisplay!);
+        if (_parsedHeightUnitForDisplay != null &&
+            _parsedHeightUnitForDisplay!.isNotEmpty) {
+          heightStr += " ${_parsedHeightUnitForDisplay}";
+        }
+
+        String weightStr = _formatCleanNumber(_parsedWeightValueForDisplay!);
+        if (_parsedWeightUnitForDisplay != null &&
+            _parsedWeightUnitForDisplay!.isNotEmpty) {
+          weightStr += " ${_parsedWeightUnitForDisplay}";
+        }
+
+        textSpans.add(TextSpan(
+            text: heightStr,
+            style:
+                TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100])));
+        textSpans.add(const TextSpan(text: ' '));
+        textSpans.add(TextSpan(
+            text: weightStr,
+            style:
+                TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100])));
       } else {
         textSpans.add(
           TextSpan(
@@ -2545,15 +2612,13 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       builder: (context, setState) {
         return GestureDetector(
           onPanDown: (_) {
-            _logger.i('Mic button pressed');
+            ;
             setState(() {
               isTouched = true;
             });
             if (_isSpeechAvailable) {
-              _logger.i('Mic button touched');
               _startListening();
             } else {
-              _logger.i('Mic not available');
               _showError(_isEnglish
                   ? 'Speech recognition not available'
                   : 'Pengenalan suara tidak tersedia');
@@ -2752,6 +2817,10 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       _isManualInputActive = true;
       _isListening = false;
       _isSavedInSession = false;
+      _parsedHeightValueForDisplay = parsedHeight;
+      _parsedHeightUnitForDisplay = _heightUnit;
+      _parsedWeightValueForDisplay = parsedWeight;
+      _parsedWeightUnitForDisplay = _weightUnit;
     });
 
     Navigator.pop(context);
@@ -2772,7 +2841,6 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       if (newHeight > 0 && newHeight != _tableHeight) {
         setState(() {
           _tableHeight = newHeight;
-          _logger.i('Table height measured: $_tableHeight');
         });
       }
     }
