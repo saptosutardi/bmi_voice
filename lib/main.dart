@@ -526,12 +526,14 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
         lowerToken == 'm' || // meter
         lowerToken == 'meter' ||
         lowerToken == 'inches' ||
-        lowerToken == 'inch' || // <<< Tambahkan ini
+        lowerToken == 'inch' ||
         lowerToken == 'in' ||
+        lowerToken == 'inci' || // Tambahkan "inci"
         lowerToken == 'inchi';
   }
 
   bool _isHeightKeyword(String? token) {
+    // ... (fungsi ini tidak berubah)
     final lowerToken = token?.toLowerCase();
     return lowerToken == 'tinggi' ||
         lowerToken == 'height' ||
@@ -540,6 +542,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   bool _isWeightToken(String? token) {
+    // ... (fungsi ini tidak berubah)
     final lowerToken = token?.toLowerCase();
     return lowerToken == 'kg' ||
         lowerToken == 'kilo' ||
@@ -548,6 +551,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
   }
 
   bool _isWeightKeyword(String? token) {
+    // ... (fungsi ini tidak berubah)
     final lowerToken = token?.toLowerCase();
     return lowerToken == 'berat' ||
         lowerToken == 'weight' ||
@@ -562,8 +566,9 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
     if (lowerUnit == 'm' || lowerUnit == 'meter') {
       return value * 100;
     } else if (lowerUnit == 'inches' ||
-        lowerUnit == 'inch' || // <<< Tambahkan ini
+        lowerUnit == 'inch' ||
         lowerUnit == 'in' ||
+        lowerUnit == 'inci' || // Tambahkan "inci"
         lowerUnit == 'inchi') {
       // Ditambahkan 'inchi' dan toLowerCase()
       return value * 2.54;
@@ -1541,7 +1546,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       title = _isEnglish ? 'Listening...' : 'Mendengarkan...';
       // Regex universal untuk menangkap kata kunci (Inggris & Indonesia) dan satuan
       final pattern = RegExp(
-        r'(height|tall|weight|mass|tinggi badan|tinggi|tb|berat|bb)?\s*(\d+[,.]?\d*)\s*(cm|sentimeter|kg|kilo|m|meter|inches|inch|in|inchi|lbs|pounds)?', // Ditambahkan 'inch' dan 'inchi'
+        r'(height|tall|weight|mass|tinggi badan|tinggi|tb|berat|bb)?\s*(\d+[,.]?\d*)\s*(cm|sentimeter|kg|kilo|m|meter|inches|inch|in|inci|inchi|lbs|pounds)?', // Ditambahkan 'inci' dan 'inchi'
         caseSensitive: false,
       );
 
@@ -1582,7 +1587,8 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
                 unit == 'm' ||
                 unit == 'meter' ||
                 unit == 'inches' ||
-                unit == 'inch' || // <<< Tambahkan ini
+                unit == 'inch' ||
+                unit == 'inci' || // <<< Tambahkan ini
                 unit == 'in' ||
                 unit == 'inchi'); // Ditambahkan 'inchi'
 
@@ -1667,21 +1673,7 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
       List<TextSpan> textSpans = [];
       print('--> Height: $_heightCm, Weight: $_weightKg');
 
-      if (_heightCm != null && _weightKg != null) {
-        textSpans.add(
-          TextSpan(
-            text: '${_formatCleanNumber(_heightCm!)} cm',
-            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
-          ),
-        );
-        textSpans.add(const TextSpan(text: ' '));
-        textSpans.add(
-          TextSpan(
-            text: '${_formatCleanNumber(_weightKg!)} kg',
-            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
-          ),
-        );
-      } else if (_parsedHeightValueForDisplay != null &&
+      if (_parsedHeightValueForDisplay != null &&
           _parsedWeightValueForDisplay != null) {
         String heightStr = _formatCleanNumber(_parsedHeightValueForDisplay!);
         if (_parsedHeightUnitForDisplay != null &&
@@ -1704,6 +1696,20 @@ class VoiceBMIPageState extends State<VoiceBMIPage>
             text: weightStr,
             style:
                 TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100])));
+      } else if (_heightCm != null && _weightKg != null) {
+        textSpans.add(
+          TextSpan(
+            text: '${_formatCleanNumber(_heightCm!)} cm',
+            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
+          ),
+        );
+        textSpans.add(const TextSpan(text: ' '));
+        textSpans.add(
+          TextSpan(
+            text: '${_formatCleanNumber(_weightKg!)} kg',
+            style: TextStyle(fontSize: 14, backgroundColor: Colors.yellow[100]),
+          ),
+        );
       } else {
         textSpans.add(
           TextSpan(
